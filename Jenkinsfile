@@ -11,7 +11,7 @@ pipeline {
             steps {
                 checkout([$class: 'GitSCM', branches: [[name: 'main']],
                           userRemoteConfigs: [[credentialsId: GITHUB_CREDENTIALS_ID,
-                                               url: 'https://github.com/sravani-paladugu/Exam-Repo.git']]]) // Adjust the URL as necessary
+                                               url: 'https://github.com/sravani-paladugu/ExamRepo.git']]]) // Adjust the URL as necessary
             }
         }
         stage('Build Docker Image') {
