@@ -1,0 +1,151 @@
+pipeline {
+    agent any
+    environment {
+        GITHUB_CREDENTIALS_ID = '9ed2ca16-c5b8-4d04-aaaa-8428591f50b3'
+        TRIVY_SEVERITY = 'HIGH,MEDIUM'
+        DOCKER_IMAGE = 'myapp:latest'
+        HIGH_SEVERITY_FLAG_FILE = 'high_severity_found.flag'
+        ARTIFACTORY_URL = 'http://myartifactory.example.com/repository/myapp'
+        STAGING_SERVER = 'staging.example.com'
+        PRODUCTION_SERVER = 'production.example.com'
+    }
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm: [$class: 'GitSCM', userRemoteConfigs: [[credentialsId: '${GITHUB_CREDENTIALS_ID}', url: 'https://github.com/myrepo/myapp.git']]]
+            }
+        }
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    sh 'docker build -t ${DOCKER_IMAGE} .'
+                }
+            }
+        }
+        stage('Trivy Scan') {
+            steps {
+                script {
+                    sh 'trivy image --severity ${TRIVY_SEVERITY} --format json --output trivy-report.json ${DOCKER_IMAGE}'
+                    sh "grep '\"Severity\": \"HIGH\"' trivy-report.json && echo true > ${HIGH_SEVERITY_FLAG_FILE} || echo false > ${HIGH_SEVERITY_FLAG_FILE}"
+                }
+            }
+        }
+        stage('Check for High Severity Alerts') {
+            steps {
+                script {
+                    def filePath = "${WORKSPACE}\\trivy-report.json"
+                    echo "Reading file from: ${filePath}"
+
+                    if (!fileExists(filePath)) {
+                        error("File does not exist: ${filePath}")
+                    }
+
+                    def reportJson = readFile(filePath).trim()
+
+                    if (reportJson.isEmpty()) {
+                        error("File is empty: ${filePath}")
+                    }
+
+                    boolean highSeverityFound = checkForHighSeverity(reportJson)
+
+                    if (highSeverityFound) {
+                        writeFile file: "${env.HIGH_SEVERITY_FLAG_FILE}", text: 'true'
+                    }
+                }
+            }
+        }
+
+        stage('Send Alerts') {
+            steps {
+                script {
+                    def highSeverityFoundFlag = 'false'
+                    if (fileExists(env.HIGH_SEVERITY_FLAG_FILE)) {
+                        highSeverityFoundFlag = readFile(env.HIGH_SEVERITY_FLAG_FILE).trim()
+                    }
+
+                    if (highSeverityFoundFlag == 'true') {
+                        echo "High severity vulnerabilities detected, sending alerts..."
+                        emailext(
+                    subject: "ALERT: High Severity Vulnerabilities Detected!",
+                    body: """<p>High severity vulnerabilities have been detected in the Docker image scan.</p>
+                             <p>Please review the Jenkins build logs for details.</p>""",
+                    mimeType: 'text/html',
+                    to: 'sravanivrsec@example.com' // Replace with actual recipient email address
+                )
+                    } else {
+                        echo "No high severity vulnerabilities detected, no alerts sent."
+                    }
+                }
+            }
+        }
+    }
+        stage('Unit Tests') {
+            steps {
+                script {
+                    sh './gradlew test'
+                }
+            }
+            post {
+                always {
+                    junit '**/build/test-results/test/*.xml'
+                }
+            }
+        }
+        stage('Publish Artifact') {
+            when {
+                branch 'main'
+            }
+            steps {
+                script {
+                    sh "docker tag ${DOCKER_IMAGE} ${ARTIFACTORY_URL}/${DOCKER_IMAGE}"
+                    sh "docker push ${ARTIFACTORY_URL}/${DOCKER_IMAGE}"
+                }
+            }
+        }
+        stage('Deploy to Staging') {
+            steps {
+                script {
+                    sh "ssh jenkins@${STAGING_SERVER} 'docker pull ${ARTIFACTORY_URL}/${DOCKER_IMAGE} && docker-compose up -d'"
+                }
+            }
+        }
+        stage('Integration Tests') {
+            steps {
+                script {
+                    sh "curl -f http://${STAGING_SERVER}/health"
+                }
+            }
+        }
+        stage('Quality Gate') {
+            steps {
+                script {
+                    if (!fileExists('go')) {
+                        error("Quality gate failed: 'go' file not found in workspace.")
+                    }
+                }
+            }
+        }
+        stage('Deploy to Production') {
+            when {
+                branch 'main'
+            }
+            steps {
+                script {
+                    sh "ssh jenkins@${PRODUCTION_SERVER} 'docker pull ${ARTIFACTORY_URL}/${DOCKER_IMAGE} && docker-compose up -d'"
+                }
+            }
+        }
+    }
+    post {
+        always {
+            script {
+                if (isUnix()) {
+                    sh 'rm -f trivy-report.json'
+                } else {
+                    bat 'del /f trivy-report.json'
+                }
+                echo "Cleaned up trivy-report.json"
+            }
+        }
+    }
+}
