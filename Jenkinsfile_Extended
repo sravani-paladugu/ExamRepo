@@ -12,7 +12,7 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                checkout scm: [$class: 'GitSCM', userRemoteConfigs: [[credentialsId: '${GITHUB_CREDENTIALS_ID}', url: 'https://github.com/myrepo/myapp.git']]]
+                checkout scm: [$class: 'GitSCM', userRemoteConfigs: [[credentialsId: '${GITHUB_CREDENTIALS_ID}', url: 'https://github.com/sravani-paladugu/ExamRepo.git']]]
             }
         }
         stage('Build Docker Image') {
