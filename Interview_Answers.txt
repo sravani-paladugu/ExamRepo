@@ -1,0 +1,30 @@
+1.Gitflow Workflow Definition
+Gitflow is a branching model for Git, designed around the project release. It assigns very specific roles to different branches and defines how and when they should interact.
+In Gitflow, the repository is divided into two main branches:
+Main (or Master): This branch contains production-ready code.
+Develop: This branch serves as an integration branch for features.
+Additionally, it defines types of branches to be used for developing features, fixing bugs, and preparing releases:
+Feature branches: Branch off from develop and merge back into develop
+Release branches: Branch off from develop and merge into both develop and main
+Hotfix branches: Branch off from main and merge into both develop and main
+
+2.Checking Integrity of Changes
+Ensure that feature development is done in feature branches that branch off develop.
+Verify that release branches are used to prepare for a new production release, allowing for minor bug fixes and preparing metadata for a release (version number, build dates, etc.).
+Confirm that any hotfixes are made in hotfix branches off main and are merged back into both main and develop.
+
+3. Pull Request vs Branches
+Pull Requests (PRs) should be used for merging any change from feature, release, or hotfix branches back into the mainline branches (develop or main). PRs allow for code review, automated checks, and discussions before changes are merged.
+Ensure that each PR is reviewed by at least one other developer to maintain code quality and integrity.
+Automated checks (CI/CD pipelines) should be in place to run tests and checks on the changes introduced in PRs.
+
+4. Release Generation
+When a release branch is ready to be moved into production, it should be merged into main and tagged with a version number.
+A release should be generated based on this tag, which might involve building Docker images, compiling code, or packaging artifacts.
+Ensure that the Dockerfile and any other deployment scripts in the repository are updated and tested as part of the release preparation process.
+
+5. Dockerfile Integrity
+For repositories containing Dockerfiles, ensure that the Dockerfile is reviewed as part of the PR process.
+Check that the Dockerfile follows best practices (e.g., using specific base image tags, minimizing the number of layers, and removing unnecessary files).
+Verify that the Docker build passes successfully and that the resulting image is tested (manually or automatically) before the PR is merged.
+Conclusion
